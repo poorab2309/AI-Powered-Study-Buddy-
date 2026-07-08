@@ -1,0 +1,14 @@
+# Environment / secrets
+.env
+
+# Python
+__pycache__/
+*.pyc
+venv/
+
+# Generated data
+chroma_db/
+
+# OS junk
+.DS_Store
+Thumbs.db
