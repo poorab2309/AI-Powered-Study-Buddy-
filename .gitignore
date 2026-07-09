@@ -12,3 +12,6 @@ chroma_db/
 # OS junk
 .DS_Store
 Thumbs.db
+current_collection.txt
+current_document.txt
+document_summary.txt
