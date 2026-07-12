@@ -9,6 +9,7 @@ from extract import extract_text
 from chunker import chunk_pages
 from embedder import build_vectorstore
 from qa_chain import answer_question, generate_document_summary, SUMMARY_FILE
+from quiz import generate_quiz
 
 app = FastAPI(title="AI-Powered Study Buddy API")
 
@@ -27,6 +28,11 @@ class ChatMessage(BaseModel):
 class Question(BaseModel):
     question: str
     history: Optional[List[ChatMessage]] = []
+
+
+class QuizRequest(BaseModel):
+    topic: Optional[str] = ""
+    num_questions: Optional[int] = 5
 
 
 def has_active_document() -> bool:
@@ -54,7 +60,6 @@ async def upload_pdf(file: UploadFile = File(...)):
     chunks = chunk_pages(pages, source=file.filename)
     build_vectorstore(chunks, persist_dir=CHROMA_DIR, collection_name=collection_name)
 
-    # record which collection is now "active"
     with open(CURRENT_COLLECTION_FILE, "w") as f:
         f.write(collection_name)
     with open(CURRENT_DOC_FILE, "w") as f:
@@ -87,9 +92,20 @@ async def ask_question(payload: Question):
     return result
 
 
+@app.post("/quiz")
+async def create_quiz(payload: QuizRequest):
+    if not has_active_document():
+        return {
+            "questions": [],
+            "error": "No document has been uploaded yet. Please upload a PDF first.",
+        }
+
+    result = generate_quiz(topic=payload.topic, num_questions=payload.num_questions)
+    return result
+
+
 @app.get("/status")
 async def status():
-    """Lets the frontend check what document (if any) is currently active on the backend."""
     if has_active_document():
         with open(CURRENT_DOC_FILE, "r") as f:
             filename = f.read().strip()
