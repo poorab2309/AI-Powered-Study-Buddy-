@@ -1,8 +1,11 @@
 import streamlit as st
 import requests
 import re
+import random
+from datetime import datetime
 
 API_URL = "http://127.0.0.1:8000"
+STUDENT_NAME = "Buddy"
 
 st.set_page_config(page_title="AI Study Buddy", page_icon="📚")
 
@@ -15,17 +18,14 @@ st.markdown(
     font-family: 'Inter', -apple-system, sans-serif;
 }
 
-/* Hide default Streamlit chrome */
 #MainMenu {visibility: hidden;}
 footer {visibility: hidden;}
 header {visibility: hidden;}
 
-/* App background */
 .stApp {
     background-color: #0d1117;
 }
 
-/* Main title */
 h1 {
     font-weight: 700 !important;
     font-size: 1.75rem !important;
@@ -33,7 +33,6 @@ h1 {
     padding-bottom: 0.5rem;
 }
 
-/* Chat message bubbles */
 [data-testid="stChatMessage"] {
     background-color: #161b22;
     border: 1px solid #21262d;
@@ -150,10 +149,28 @@ PROGRESS_KEYWORDS = [
     "weak areas",
     "my score",
 ]
+EXPLAIN_KEYWORDS = [
+    "explain",
+    "why",
+    "what does",
+    "clarify",
+    "help me understand",
+    "don't understand",
+    "dont understand",
+    "i don't get",
+    "i dont get",
+    "confused about",
+]
+
+
+def is_explain_request(text):
+    return any(k in text.lower() for k in EXPLAIN_KEYWORDS)
 
 
 def is_quiz_request(text):
     lowered = text.lower()
+    if is_explain_request(text):
+        return False
     if any(k in lowered for k in QUIZ_KEYWORDS):
         return True
     action_words = [
@@ -196,6 +213,64 @@ def extract_num(text, default=5, max_val=10):
     return default
 
 
+def get_greeting(name="there"):
+    hour = datetime.now().hour
+
+    if 5 <= hour < 12:
+        options = [
+            f"Good morning, {name}",
+            f"Early start, {name}",
+            f"Rise and study, {name}",
+        ]
+    elif 12 <= hour < 17:
+        options = [
+            f"Good afternoon, {name}",
+            f"Back at it, {name}",
+            f"Study session, {name}",
+        ]
+    elif 17 <= hour < 22:
+        options = [
+            f"Good evening, {name}",
+            f"Evening grind, {name}",
+            f"Still going, {name}",
+        ]
+    else:
+        options = [
+            f"Night owl, {name}",
+            f"Late night studying, {name}",
+            f"Burning the midnight oil, {name}",
+        ]
+
+    return random.choice(options)
+
+
+def build_history_payload(messages):
+    """
+    Converts chat history into a format the backend can use for context,
+    including quiz content so follow-up questions like 'explain question 5'
+    can actually reference what was asked.
+    """
+    history = []
+    for m in messages:
+        if m.get("type") == "text":
+            history.append({"role": m["role"], "content": m.get("content", "")})
+        elif m.get("type") == "quiz":
+            quiz_summary = "Here was the quiz I gave the student:\n"
+            for qi, q in enumerate(m["quiz_data"]):
+                quiz_summary += (
+                    f"{qi+1}. {q['question']} (Correct answer: {q['correct_answer']})\n"
+                )
+            history.append({"role": "assistant", "content": quiz_summary})
+        elif m.get("type") == "flashcards":
+            card_summary = "Here were the flashcards I gave the student:\n"
+            for ci, card in enumerate(m["cards"]):
+                card_summary += (
+                    f"{ci+1}. Front: {card['front']} | Back: {card['back']}\n"
+                )
+            history.append({"role": "assistant", "content": card_summary})
+    return history
+
+
 if "checked_status" not in st.session_state:
     try:
         status = requests.get(f"{API_URL}/status", timeout=5).json()
@@ -208,6 +283,9 @@ if "checked_status" not in st.session_state:
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
+
+if "greeting" not in st.session_state:
+    st.session_state.greeting = get_greeting(STUDENT_NAME)
 
 with st.sidebar:
     st.header("Upload Study Material")
@@ -233,6 +311,7 @@ with st.sidebar:
                         st.session_state.document_uploaded = True
                         st.session_state.current_filename = result["filename"]
                         st.session_state.messages = []
+                        st.session_state.greeting = get_greeting(STUDENT_NAME)
                 else:
                     st.error("Upload failed. Check the backend server.")
             except requests.exceptions.RequestException as e:
@@ -240,11 +319,29 @@ with st.sidebar:
 
     st.divider()
     st.caption(
-        "💡 Try: *'quiz me'*, *'give me short answer questions'*, *'give me formula questions'*, *'flashcards'*, *'my progress'*"
+        "💡 Try: *'quiz me'*, *'give me short answer questions'*, *'give me formula questions'*, *'flashcards'*, *'my progress'*, or *'explain question 3'*"
     )
 
 if not st.session_state.document_uploaded:
-    st.info("Upload a PDF, DOCX, or TXT file from the sidebar to get started.")
+    st.markdown(
+        f"""
+    <div style="text-align: center; padding: 4rem 2rem; opacity: 0.7;">
+        <div style="font-size: 1.3rem; font-weight: 600; margin-bottom: 0.75rem;">{st.session_state.greeting}</div>
+        <div style="font-size: 0.95rem; color: #8b949e;">Upload a PDF, DOCX, or TXT to get started.</div>
+    </div>
+    """,
+        unsafe_allow_html=True,
+    )
+elif not st.session_state.messages:
+    st.markdown(
+        f"""
+    <div style="text-align: center; padding: 4rem 2rem; opacity: 0.7;">
+        <div style="font-size: 1.3rem; font-weight: 600; margin-bottom: 0.75rem;">{st.session_state.greeting}</div>
+        <div style="font-size: 0.95rem; color: #8b949e;">Ready to help with <b>{st.session_state.current_filename}</b> — ask a question, or try "quiz me"</div>
+    </div>
+    """,
+        unsafe_allow_html=True,
+    )
 
 for i, msg in enumerate(st.session_state.messages):
     with st.chat_message(msg["role"]):
@@ -360,7 +457,7 @@ for i, msg in enumerate(st.session_state.messages):
                 st.caption(label)
 
 if question := st.chat_input(
-    "Ask a question, say 'quiz me', 'flashcards', or 'my progress'..."
+    "Ask a question, say 'quiz me', 'flashcards', or 'explain question 3'..."
 ):
     st.session_state.messages.append(
         {"role": "user", "content": question, "type": "text"}
@@ -470,11 +567,7 @@ if question := st.chat_input(
 
         else:
             with st.spinner("Thinking..."):
-                history_payload = [
-                    {"role": m["role"], "content": m.get("content", "")}
-                    for m in st.session_state.messages[:-1]
-                    if m.get("type") == "text"
-                ]
+                history_payload = build_history_payload(st.session_state.messages[:-1])
                 try:
                     response = requests.post(
                         f"{API_URL}/ask",

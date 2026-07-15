@@ -15,3 +15,7 @@ Thumbs.db
 current_collection.txt
 current_document.txt
 document_summary.txt
+
+data/*.pdf
+data/*.docx
+data/*.txt
