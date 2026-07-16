@@ -1,0 +1,14 @@
+﻿venv/
+.git/
+.gitignore
+__pycache__/
+*.pyc
+chroma_db/
+data/*.pdf
+data/*.docx
+data/*.txt
+.env
+current_collection.txt
+current_document.txt
+document_summary.txt
+weak_areas.json

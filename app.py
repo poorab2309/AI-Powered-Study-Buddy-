@@ -2,9 +2,10 @@ import streamlit as st
 import requests
 import re
 import random
+import os
 from datetime import datetime
 
-API_URL = "http://127.0.0.1:8000"
+API_URL = os.getenv("API_URL", "http://127.0.0.1:8000")
 STUDENT_NAME = "Buddy"
 
 st.set_page_config(page_title="AI Study Buddy", page_icon="📚")
@@ -245,11 +246,6 @@ def get_greeting(name="there"):
 
 
 def build_history_payload(messages):
-    """
-    Converts chat history into a format the backend can use for context,
-    including quiz content so follow-up questions like 'explain question 5'
-    can actually reference what was asked.
-    """
     history = []
     for m in messages:
         if m.get("type") == "text":
