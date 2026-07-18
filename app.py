@@ -295,7 +295,7 @@ with st.sidebar:
         with st.spinner("Extracting, chunking, embedding, and summarizing..."):
             files = {"file": (uploaded_file.name, uploaded_file.getvalue())}
             try:
-                response = requests.post(f"{API_URL}/upload", files=files, timeout=120)
+                response = requests.post(f"{API_URL}/upload", files=files, timeout=300)
                 if response.status_code == 200:
                     result = response.json()
                     if result.get("status") == "error":

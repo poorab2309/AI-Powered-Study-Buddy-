@@ -10,6 +10,7 @@
     volumes:
       - chroma_data:/app/chroma_db
       - upload_data:/app/data
+      - hf_cache:/root/.cache/huggingface
 
   frontend:
     build:
@@ -25,3 +26,4 @@
 volumes:
   chroma_data:
   upload_data:
+  hf_cache:
