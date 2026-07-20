@@ -267,6 +267,28 @@ def build_history_payload(messages):
     return history
 
 
+def normalize_answer(text):
+    """Strips whitespace, $ signs, and LaTeX backslashes so formatting
+    differences (spacing, LaTeX symbols) don't cause false mismatches."""
+    text = (text or "").strip().lower()
+    text = re.sub(r"[\$\s]+", "", text)
+    text = text.replace("\\", "")
+    return text
+
+
+def check_answer(user_ans, correct_ans):
+    """Returns False for empty/unanswered questions (fixes the bug where
+    blank answers were counted as correct via substring matching), and
+    does normalized substring comparison otherwise."""
+    if not user_ans or not user_ans.strip():
+        return False
+    norm_user = normalize_answer(user_ans)
+    norm_correct = normalize_answer(correct_ans)
+    if not norm_user:
+        return False
+    return norm_user in norm_correct or norm_correct in norm_user
+
+
 if "checked_status" not in st.session_state:
     try:
         status = requests.get(f"{API_URL}/status", timeout=5).json()
@@ -374,12 +396,7 @@ for i, msg in enumerate(st.session_state.messages):
                     if qtype == "mcq":
                         correct = user_ans == q["correct_answer"]
                     else:
-                        correct = (
-                            user_ans.strip().lower()
-                            in q["correct_answer"].strip().lower()
-                            or q["correct_answer"].strip().lower()
-                            in user_ans.strip().lower()
-                        )
+                        correct = check_answer(user_ans, q["correct_answer"])
                     results_payload.append(
                         {"source_page": q.get("source_page"), "correct": correct}
                     )
@@ -401,12 +418,7 @@ for i, msg in enumerate(st.session_state.messages):
                         is_correct = user_ans == q["correct_answer"]
                         correct_display = q["correct_answer"]
                     else:
-                        is_correct = (
-                            user_ans.strip().lower()
-                            in q["correct_answer"].strip().lower()
-                            or q["correct_answer"].strip().lower()
-                            in user_ans.strip().lower()
-                        )
+                        is_correct = check_answer(user_ans, q["correct_answer"])
                         correct_display = q["correct_answer"]
                     if is_correct:
                         score += 1
